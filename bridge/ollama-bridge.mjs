@@ -163,20 +163,30 @@ async function handleRecognize(req, res) {
   const b64 = imgPart.body.toString("base64");
 
   const system =
-    "당신은 한국 가정 냉장고 사진을 분석해 식재료 목록을 추출하는 비전 모델입니다. " +
-    "사람·배경·용기·상표는 무시하고 식재료만 추출하세요. " +
-    "출력은 반드시 JSON 한 덩어리. 예: {\"items\":[{\"label\":\"사과\",\"quantity\":2,\"unit\":\"개\",\"confidence\":0.86}]} " +
-    "규칙: " +
-    "(1) label은 반드시 한국어 식재료명. 영어·한자·일본어 가나 사용 금지. " +
+    "당신은 한국 가정 냉장고 사진에서 식재료만 추출하는 비전 모델입니다. " +
+    "출력은 반드시 JSON 한 덩어리. 예: " +
+    "{\"items\":[{\"label\":\"사과\",\"quantity\":2,\"unit\":\"개\",\"confidence\":0.86,\"is_food\":true}]} " +
+    "절대 규칙: " +
+    "(A) 환각 금지. 사진에 명확히 보이지 않는 것은 절대 추측·추가하지 말 것. " +
+    "    '아마 ~일 것 같다', '~로 보인다' 같은 추론은 출력하지 말 것. " +
+    "    확실하지 않으면 그 항목을 출력하지 말 것 (confidence가 0.6 미만이면 제외). " +
+    "(B) 식재료가 아닌 것은 모두 제외. 다음은 절대 출력하지 말 것: " +
+    "    그릇·접시·컵·도마·칼·수저·포크·냉장고 선반·통·뚜껑·비닐봉지·종이상자 등 용기와 도구, " +
+    "    상표·로고·문자·숫자, 사람·손·얼굴·옷, 배경·벽·바닥·테이블·식탁보, " +
+    "    가구·가전·인테리어·장식, 비식품(휴지·세제·약·화장품). " +
+    "    is_food=false 인 항목은 응답에 포함하지 말 것. " +
+    "(C) 빈 결과 허용. 사진에 식재료가 전혀 보이지 않거나 식재료를 식별할 수 없으면 " +
+    "    반드시 {\"items\":[]} 빈 배열을 반환하라. 억지로 채우지 말 것. " +
+    "(D) label은 반드시 한국어 식재료명. 영어·한자·일본어 가나 금지. " +
     "    예: apple→사과, egg→계란, tomato→토마토, milk→우유. " +
-    "(2) 같은 식재료가 여러 개 보이면 항목을 나누지 말고 quantity 숫자로 합산. " +
-    "    예: 사과가 3개 보이면 {\"label\":\"사과\",\"quantity\":3,\"unit\":\"개\"} 한 항목으로만. " +
-    "    동일한 label을 여러 번 반복 출력하면 안 됨. " +
-    "(3) unit은 개/모/장/포기/g/ml/팩/병 중 적절히. confidence는 0~1.";
+    "(E) 같은 식재료가 여러 개 보이면 한 항목으로 합치고 quantity 숫자로 표시. " +
+    "    동일 label을 여러 번 반복 출력 금지. " +
+    "(F) unit은 개/모/장/포기/g/ml/팩/병 중 적절히. confidence는 사진에서 식별의 확신도(0~1). " +
+    "    is_food는 반드시 true로만 출력 (식재료가 아니면 애초에 항목을 만들지 말 것).";
 
   const prompt =
-    "사진에서 보이는 식재료를 모두 추출해 위 형식의 JSON으로만 답하세요. " +
-    "동일 식재료는 한 항목으로 합치고 quantity 숫자로만 표시하세요. " +
+    "이 사진에서 실제로 보이는 식재료만 추출해 위 형식의 JSON으로 답하세요. " +
+    "추측·환각·식재료 외 항목 금지. 식재료가 보이지 않으면 {\"items\":[]}. " +
     "설명·마크다운·코드펜스 없이 JSON 객체 하나만 출력하세요.";
 
   const t0 = Date.now();
@@ -185,7 +195,7 @@ async function handleRecognize(req, res) {
     images: [b64],
     system,
     format: "json",
-    temperature: 0.1,
+    temperature: 0.05,
     num_predict: 512,
   });
   const text = (r?.response ?? "").trim();
@@ -198,8 +208,10 @@ async function handleRecognize(req, res) {
         quantity: Number(it.quantity ?? it.count ?? 1) || 1,
         unit: String(it.unit ?? "개").trim() || "개",
         confidence: Number(it.confidence ?? 0.7) || 0.7,
+        is_food: it.is_food !== false,
       }))
-      .filter((it) => it.label.length > 0)
+      // 비식품 + 낮은 신뢰도 (≤0.5) 모두 제외. 한국어 라벨 검증은 /api/recognize에서 한 번 더.
+      .filter((it) => it.label.length > 0 && it.is_food && it.confidence > 0.5)
       .slice(0, 30);
   }
 
