@@ -259,7 +259,7 @@ async def recognize(request: Request, image: UploadFile = File(...), _=Depends(c
                     {"role": "system", "content": RECOGNIZE_SYSTEM},
                     {"role": "user", "content": RECOGNIZE_PROMPT, "images": [image_bytes]},
                 ],
-                options={"num_predict": 2048, "temperature": 0, "num_ctx": 4096},
+                options={"num_predict": 2048, "temperature": 0.1, "num_ctx": 4096},
             )
         except Exception as exc:
             error_box[0] = exc
@@ -367,7 +367,8 @@ async def expiry_suggest(request: Request, req: ExpirySuggestRequest, _=Depends(
                 {"role": "system", "content": EXPIRY_SYSTEM},
                 {"role": "user", "content": prompt},
             ],
-            options={"num_predict": 512, "temperature": 0, "num_ctx": 2048},
+            options={"num_predict": 512, "temperature": 0.1, "num_ctx": 2048},
+            think=False,
         )
         raw: str = response.message.content
         data = extract_json(raw)
@@ -481,45 +482,72 @@ async def suggest_recipes(request: Request, req: RecipesRequest, _=Depends(check
 - reason은 30자 이내, '분' '인분' 표기 금지
 - 임박 재료를 최대한 활용"""
 
-    try:
-        response = ollama.chat(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": RECIPES_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            options={"num_predict": 2048, "temperature": 0, "num_ctx": 4096},
-        )
-        raw: str = response.message.content
-        data = extract_json(raw)
+    loop = asyncio.get_running_loop()
+    result_box: list = [None]
+    error_box: list = [None]
+    done = asyncio.Event()
 
-        validated = []
-        for s in (data.get("suggestions") or data.get("recommendations") or [])[:5]:
-            if not isinstance(s, dict) or not s.get("name"):
-                continue
-            category = s.get("category", "반찬")
-            if category not in RECIPE_CATEGORIES:
-                category = "반찬"
-            validated.append(
-                {
+    def _infer():
+        try:
+            result_box[0] = ollama.chat(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": RECIPES_SYSTEM},
+                    {"role": "user", "content": prompt},
+                ],
+                options={"num_predict": 2048, "temperature": 0.1, "num_ctx": 8192},
+                think=False,
+            )
+        except Exception as exc:
+            error_box[0] = exc
+        finally:
+            loop.call_soon_threadsafe(done.set)
+
+    threading.Thread(target=_infer, daemon=True).start()
+
+    async def _stream():
+        while not done.is_set():
+            await asyncio.sleep(5)
+            if not done.is_set():
+                yield b"\n"
+
+        if error_box[0] is not None:
+            yield json.dumps({"error": str(error_box[0])}).encode()
+            return
+
+        response = result_box[0]
+        raw: str = response.message.content
+        logger.info(f"recipes raw ({len(raw)}자): {raw[:200]!r}")
+
+        if not raw.strip():
+            yield json.dumps({"error": "모델이 빈 응답을 반환했습니다. 재시도해 주세요."}).encode()
+            return
+
+        try:
+            data = extract_json(raw)
+            validated = []
+            for s in (data.get("suggestions") or data.get("recommendations") or [])[:5]:
+                if not isinstance(s, dict) or not s.get("name"):
+                    continue
+                category = s.get("category", "반찬")
+                if category not in RECIPE_CATEGORIES:
+                    category = "반찬"
+                validated.append({
                     "name": clamp_str(s["name"], 40),
                     "uses": [str(u) for u in s.get("uses", [])],
                     "reason": clean_reason(str(s.get("reason", ""))),
                     "category": category,
-                }
-            )
+                })
+            yield json.dumps({
+                "suggestions": validated,
+                "raw": raw,
+                "model": MODEL,
+                "elapsed_ms": int((time.time() - t0) * 1000),
+            }).encode()
+        except Exception as exc:
+            yield json.dumps({"error": str(exc)}).encode()
 
-        return {
-            "suggestions": validated,
-            "raw": raw,
-            "model": MODEL,
-            "elapsed_ms": int((time.time() - t0) * 1000),
-        }
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    return StreamingResponse(_stream(), media_type="application/json")
 
 # ============================================================
 # 진입점

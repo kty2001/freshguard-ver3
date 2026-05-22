@@ -138,7 +138,8 @@ export interface RecipesResponse {
 }
 
 export async function suggestRecipes(payload: RecipeRequestPayload): Promise<RecipesResponse> {
-  const r = await postJson<RecipesResponse>("/v1/recipes", payload, TIMEOUT_RECIPES_MS);
+  const r = await postJson<RecipesResponse & { error?: string }>("/v1/recipes", payload, TIMEOUT_RECIPES_MS);
+  if (r.error) throw new Error(`VLM 레시피 오류: ${r.error}`);
   return {
     suggestions: Array.isArray(r.suggestions) ? r.suggestions : [],
     raw: r.raw,
