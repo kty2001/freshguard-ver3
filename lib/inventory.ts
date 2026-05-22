@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { BudgetEntry, ConsumeLog, EcoSummary, InventoryItem, RemoveKind, StorageType } from "./types";
-import { co2PerKg, loadExpiryDb } from "./expiryDb";
+import { co2PerKg, loadExpiryDb, matchExpiry } from "./expiryDb";
 import { suggestExpiry } from "./expirySuggest";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -84,12 +84,21 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
     days = input.manual_expiry_days;
     category = input.category;
   } else {
-    // 항상 LLM에 추정 위임. 실패 시 suggestExpiry 내부에서 7일 기본값으로 폴백.
-    const r = await suggestExpiry(input.display_name);
-    days = r.days > 0 ? r.days : 7;
-    category = r.category ?? input.category;
-    storage_type = r.storage_type;
-    if (r.name && r.name.trim()) normalized_name = r.name.trim();
+    // 1) 로컬 DB에서 먼저 조회 (즉시 응답, VLM 호출 없음).
+    const dbMatch = matchExpiry(input.display_name);
+    if (dbMatch.matched && dbMatch.row && dbMatch.row.expiry_days_default > 0) {
+      days = dbMatch.row.expiry_days_default;
+      category = dbMatch.row.category ?? input.category;
+      storage_type = (dbMatch.row.storage_type as StorageType) ?? "냉장";
+      if (dbMatch.row.food_name) normalized_name = dbMatch.row.food_name;
+    } else {
+      // 2) DB에 없는 경우에만 LLM에 위임.
+      const r = await suggestExpiry(input.display_name);
+      days = r.days > 0 ? r.days : 7;
+      category = r.category ?? input.category;
+      storage_type = r.storage_type;
+      if (r.name && r.name.trim()) normalized_name = r.name.trim();
+    }
   }
 
   const added = input.added_at ? new Date(input.added_at) : new Date();

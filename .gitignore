@@ -3,6 +3,7 @@ node_modules
 out
 dist
 .env
+.env.example
 .env.local
 .env*.local
 *.log
