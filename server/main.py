@@ -10,10 +10,12 @@ import time
 import logging
 from typing import Optional, List, Any
 
+import asyncio
+import threading
 import ollama
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Header, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -77,6 +79,34 @@ def check_auth(authorization: Optional[str] = Header(default=None)) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def _repair_truncated_json(text: str) -> str:
+    """잘린 JSON의 미닫힌 괄호를 닫아 복구 시도."""
+    stack = []
+    in_string = False
+    escape_next = False
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]" and stack and stack[-1] == ch:
+            stack.pop()
+    suffix = ""
+    if in_string:
+        suffix += '"'
+    suffix += "".join(reversed(stack))
+    return text + suffix
+
+
 def extract_json(text: str) -> Any:
     """LLM 응답에서 JSON 추출 — 마크다운 코드블록, 불필요한 전후 텍스트 처리."""
     text = text.strip()
@@ -115,6 +145,12 @@ def extract_json(text: str) -> Any:
             return json.loads(candidate)
         except json.JSONDecodeError:
             continue
+
+    # 잘린 JSON 복구 시도
+    try:
+        return json.loads(_repair_truncated_json(text))
+    except (json.JSONDecodeError, Exception):
+        pass
 
     raise ValueError(f"JSON 추출 실패: {text[:300]}")
 
@@ -188,41 +224,64 @@ async def recognize(request: Request, image: UploadFile = File(...), _=Depends(c
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail=f"이미지 크기 초과 (최대 {MAX_IMAGE_BYTES // 1024 // 1024}MB)")
 
-    try:
-        response = ollama.chat(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": RECOGNIZE_SYSTEM},
-                {"role": "user", "content": RECOGNIZE_PROMPT, "images": [image_bytes]},
-            ],
-        )
-        raw: str = response.message.content
-        data = extract_json(raw)
+    loop = asyncio.get_running_loop()
+    result_box: list = [None]
+    error_box: list = [None]
+    done = asyncio.Event()
 
-        validated = []
-        for item in data.get("items", []):
-            if not isinstance(item, dict) or not item.get("label"):
-                continue
-            validated.append(
-                {
+    def _infer():
+        try:
+            result_box[0] = ollama.chat(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": RECOGNIZE_SYSTEM},
+                    {"role": "user", "content": RECOGNIZE_PROMPT, "images": [image_bytes]},
+                ],
+                options={"num_predict": 2048, "temperature": 0, "num_ctx": 4096},
+            )
+        except Exception as exc:
+            error_box[0] = exc
+        finally:
+            loop.call_soon_threadsafe(done.set)
+
+    threading.Thread(target=_infer, daemon=True).start()
+
+    async def _stream():
+        # NAT/라우터 유휴 타임아웃 방지: 추론 대기 중 5초마다 개행 전송.
+        # JSON.parse는 앞뒤 공백·개행을 무시하므로 클라이언트에 무해하다.
+        while not done.is_set():
+            await asyncio.sleep(5)
+            if not done.is_set():
+                yield b"\n"
+
+        if error_box[0] is not None:
+            yield json.dumps({"error": str(error_box[0])}).encode()
+            return
+
+        response = result_box[0]
+        raw: str = response.message.content
+        try:
+            data = extract_json(raw)
+            validated = []
+            for item in data.get("items", []):
+                if not isinstance(item, dict) or not item.get("label"):
+                    continue
+                validated.append({
                     "label": clamp_str(item["label"], 40),
                     "quantity": float(item.get("quantity", 1)),
                     "unit": clamp_str(item.get("unit", "개"), 10),
                     "confidence": max(0.0, min(1.0, float(item.get("confidence", 0.8)))),
-                }
-            )
+                })
+            yield json.dumps({
+                "items": validated,
+                "raw": raw,
+                "model": MODEL,
+                "elapsed_ms": int((time.time() - t0) * 1000),
+            }).encode()
+        except Exception as exc:
+            yield json.dumps({"error": str(exc)}).encode()
 
-        return {
-            "items": validated,
-            "raw": raw,
-            "model": MODEL,
-            "elapsed_ms": int((time.time() - t0) * 1000),
-        }
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    return StreamingResponse(_stream(), media_type="application/json")
 
 # ============================================================
 # /v1/expiry/suggest
@@ -286,6 +345,7 @@ async def expiry_suggest(request: Request, req: ExpirySuggestRequest, _=Depends(
                 {"role": "system", "content": EXPIRY_SYSTEM},
                 {"role": "user", "content": prompt},
             ],
+            options={"num_predict": 512, "temperature": 0, "num_ctx": 2048},
         )
         raw: str = response.message.content
         data = extract_json(raw)
@@ -406,6 +466,7 @@ async def suggest_recipes(request: Request, req: RecipesRequest, _=Depends(check
                 {"role": "system", "content": RECIPES_SYSTEM},
                 {"role": "user", "content": prompt},
             ],
+            options={"num_predict": 2048, "temperature": 0, "num_ctx": 4096},
         )
         raw: str = response.message.content
         data = extract_json(raw)

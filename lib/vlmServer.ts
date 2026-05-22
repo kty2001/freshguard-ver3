@@ -88,7 +88,8 @@ export async function recognize(imageBuf: Buffer, filename = "upload.jpg"): Prom
   const form = new FormData();
   const blob = new Blob([new Uint8Array(imageBuf)], { type: "application/octet-stream" });
   form.append("image", blob, filename);
-  const r = await postMultipart<RecognizeResponse>("/v1/recognize", form, TIMEOUT_RECOGNIZE_MS);
+  const r = await postMultipart<RecognizeResponse & { error?: string }>("/v1/recognize", form, TIMEOUT_RECOGNIZE_MS);
+  if (r.error) throw new Error(`VLM 인식 오류: ${r.error}`);
   return {
     items: Array.isArray(r.items) ? r.items : [],
     raw: r.raw,

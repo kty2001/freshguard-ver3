@@ -59,6 +59,7 @@ def pull_model() -> None:
     )
 
     try:
+        pull_failed = False
         with urllib.request.urlopen(req, timeout=1800) as resp:
             for raw_line in resp:
                 line = raw_line.decode().strip()
@@ -66,6 +67,10 @@ def pull_model() -> None:
                     continue
                 try:
                     info = json.loads(line)
+                    if "error" in info:
+                        _log(f"Pull 오류: {info['error']}")
+                        pull_failed = True
+                        break
                     status = info.get("status", "")
                     total = info.get("total", 0)
                     completed = info.get("completed", 0)
@@ -77,7 +82,10 @@ def pull_model() -> None:
                 except json.JSONDecodeError:
                     pass
         print(flush=True)
-        _log(f"모델 {MODEL} 준비 완료.")
+        if pull_failed:
+            _log(f"모델 {MODEL} Pull 실패 — 서버는 계속 시작합니다.")
+        else:
+            _log(f"모델 {MODEL} 준비 완료.")
     except urllib.error.URLError as e:
         _log(f"Pull 실패: {e} — 서버는 계속 시작합니다.")
 
