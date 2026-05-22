@@ -107,13 +107,35 @@ def _repair_truncated_json(text: str) -> str:
     return text + suffix
 
 
+def _fix_unquoted_units(text: str) -> str:
+    """'quantity': 300g 처럼 단위가 붙은 비따옴표 값을 문자열로 변환."""
+    return re.sub(
+        r'("quantity"\s*:\s*)(\d+(?:\.\d+)?[a-zA-Z가-힣]+)(\s*[,\}\]])',
+        lambda m: f'{m.group(1)}"{m.group(2)}"{m.group(3)}',
+        text,
+    )
+
+
 def extract_json(text: str) -> Any:
     """LLM 응답에서 JSON 추출 — 마크다운 코드블록, 불필요한 전후 텍스트 처리."""
     text = text.strip()
 
+    def _try(s: str) -> Any:
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            pass
+        fixed = _fix_unquoted_units(s)
+        if fixed != s:
+            try:
+                return json.loads(fixed)
+            except json.JSONDecodeError:
+                pass
+        raise json.JSONDecodeError("", s, 0)
+
     # 직접 파싱 시도
     try:
-        return json.loads(text)
+        return _try(text)
     except json.JSONDecodeError:
         pass
 
@@ -121,7 +143,7 @@ def extract_json(text: str) -> Any:
     m = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if m:
         try:
-            return json.loads(m.group(1))
+            return _try(m.group(1))
         except json.JSONDecodeError:
             pass
 
@@ -142,13 +164,13 @@ def extract_json(text: str) -> Any:
 
     for candidate in sorted(braces, key=len, reverse=True):
         try:
-            return json.loads(candidate)
+            return _try(candidate)
         except json.JSONDecodeError:
             continue
 
     # 잘린 JSON 복구 시도
     try:
-        return json.loads(_repair_truncated_json(text))
+        return _try(_repair_truncated_json(text))
     except (json.JSONDecodeError, Exception):
         pass
 
@@ -268,7 +290,7 @@ async def recognize(request: Request, image: UploadFile = File(...), _=Depends(c
                     continue
                 validated.append({
                     "label": clamp_str(item["label"], 40),
-                    "quantity": float(item.get("quantity", 1)),
+                    "quantity": float(re.search(r"[\d.]+", str(item.get("quantity", 1))).group()),
                     "unit": clamp_str(item.get("unit", "개"), 10),
                     "confidence": max(0.0, min(1.0, float(item.get("confidence", 0.8)))),
                 })
@@ -472,7 +494,7 @@ async def suggest_recipes(request: Request, req: RecipesRequest, _=Depends(check
         data = extract_json(raw)
 
         validated = []
-        for s in (data.get("suggestions") or [])[:5]:
+        for s in (data.get("suggestions") or data.get("recommendations") or [])[:5]:
             if not isinstance(s, dict) or not s.get("name"):
                 continue
             category = s.get("category", "반찬")
