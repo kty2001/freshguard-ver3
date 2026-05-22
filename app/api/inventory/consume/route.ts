@@ -16,7 +16,11 @@ export async function POST(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
   const kind = asKind(body?.kind);
   const weight_g = typeof body?.weight_g === "number" ? body.weight_g : undefined;
-  const log = consumeItem(id, kind, weight_g);
+  const qty =
+    typeof body?.qty === "number" && body.qty > 0
+      ? Math.round(body.qty)
+      : undefined;
+  const log = consumeItem(id, kind, weight_g, qty);
   if (kind === "mistake") return NextResponse.json({ ok: true, kind });
   if (!log)
     return NextResponse.json(

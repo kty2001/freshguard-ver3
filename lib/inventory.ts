@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { BudgetEntry, ConsumeLog, EcoSummary, InventoryItem, RemoveKind } from "./types";
-import { co2PerKg, loadExpiryDb, matchExpiry } from "./expiryDb";
+import type { BudgetEntry, ConsumeLog, EcoSummary, InventoryItem, RemoveKind, StorageType } from "./types";
+import { co2PerKg, loadExpiryDb } from "./expiryDb";
+import { suggestExpiry } from "./expirySuggest";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ITEMS_PATH = path.join(DATA_DIR, "inventory.json");
@@ -69,34 +70,48 @@ export interface AddItemInput {
   price_krw?: number;
 }
 
-export function addItem(input: AddItemInput): InventoryItem {
+// ver3 정책: 유통기한·카테고리·보관법은 로컬 DB를 사용하지 않고 LLM에 위임.
+// manual_expiry_days가 입력되면 그대로 사용, 아니면 suggestExpiry로 LLM 호출.
+export async function addItem(input: AddItemInput): Promise<InventoryItem> {
   const items = readItems();
-  const m = matchExpiry(input.display_name);
-  const days =
-    input.manual_expiry_days != null && input.manual_expiry_days > 0
-      ? input.manual_expiry_days
-      : m.row?.expiry_days_default ?? 7;
+
+  let days: number;
+  let category: string | undefined;
+  let storage_type: StorageType = "냉장";
+  let normalized_name = input.display_name.trim();
+
+  if (input.manual_expiry_days != null && input.manual_expiry_days > 0) {
+    days = input.manual_expiry_days;
+    category = input.category;
+  } else {
+    // 항상 LLM에 추정 위임. 실패 시 suggestExpiry 내부에서 7일 기본값으로 폴백.
+    const r = await suggestExpiry(input.display_name);
+    days = r.days > 0 ? r.days : 7;
+    category = r.category ?? input.category;
+    storage_type = r.storage_type;
+    if (r.name && r.name.trim()) normalized_name = r.name.trim();
+  }
 
   const added = input.added_at ? new Date(input.added_at) : new Date();
   const exp = new Date(added.getTime() + days * 24 * 60 * 60 * 1000);
 
   // FR-04: 카테고리 없는 항목이 '전체' 필터에서 누락 → '기타' 폴백 보장.
-  const category = m.row?.category ?? input.category ?? "기타";
+  category = category ?? "기타";
 
   const item: InventoryItem = {
     id: randomUUID(),
-    name: m.normalized_key,
+    name: normalized_name,
     display_name: input.display_name.trim(),
     quantity: Math.max(1, Math.round(input.quantity ?? 1)),
-    unit: input.unit?.trim() || (m.row ? defaultUnit(m.row.food_name) : "개"),
+    unit: input.unit?.trim() || defaultUnit(normalized_name),
     category,
-    storage_type: m.row?.storage_type ?? "냉장",
+    storage_type,
     added_at: added.toISOString(),
     expires_at: exp.toISOString(),
     expiry_days_used: days,
     is_consumed: false,
-    matched_db_key: m.row?.food_name,
-    manual: input.manual ?? !m.matched,
+    matched_db_key: normalized_name,
+    manual: input.manual ?? true,
   };
 
   items.push(item);
@@ -127,39 +142,67 @@ function defaultUnit(name: string): string {
 }
 
 // FR-03: '폐기'와 '잘못 입력 삭제' 분리. 'mistake'는 로그 미적재.
-export function removeItem(id: string): boolean {
+// qty 미지정 시 전체 삭제. 지정 시 해당 개수만 차감(0 이하 되면 삭제).
+export function removeItem(id: string, qty?: number): boolean {
   const items = readItems();
   const idx = items.findIndex((i) => i.id === id);
   if (idx < 0) return false;
-  items.splice(idx, 1);
+  if (qty == null) {
+    items.splice(idx, 1);
+  } else {
+    const remove = Math.max(1, Math.round(qty));
+    if (remove >= items[idx].quantity) {
+      items.splice(idx, 1);
+    } else {
+      items[idx] = { ...items[idx], quantity: items[idx].quantity - remove };
+    }
+  }
   writeItems(items);
   return true;
 }
 
 // FR-02: 소비/처리 분리 → kind='eaten' | 'disposed' | 'mistake'
+// qty 미지정 시 전체 소비(기존 동작). 지정 시 그 개수만 차감하고 로그도 그 개수 기준.
 export function consumeItem(
   id: string,
   kind: RemoveKind = "eaten",
-  weight_g?: number
+  weight_g?: number,
+  qty?: number
 ): ConsumeLog | null {
   const items = readItems();
-  const it = items.find((i) => i.id === id && !i.is_consumed);
-  if (!it) return null;
+  const idx = items.findIndex((i) => i.id === id && !i.is_consumed);
+  if (idx < 0) return null;
+  const it = items[idx];
+
+  const requested = qty == null ? it.quantity : Math.max(1, Math.round(qty));
+  const removeQty = Math.min(requested, it.quantity);
+  const remainder = it.quantity - removeQty;
 
   if (kind === "mistake") {
-    removeItem(id);
+    if (remainder <= 0) {
+      items.splice(idx, 1);
+    } else {
+      items[idx] = { ...it, quantity: remainder };
+    }
+    writeItems(items);
     return null;
   }
 
-  it.is_consumed = true;
-  it.consumed_at = new Date().toISOString();
+  const consumed_at = new Date().toISOString();
+  if (remainder <= 0) {
+    items[idx] = { ...it, is_consumed: true, consumed_at };
+  } else {
+    // 부분 소비: 수량만 줄이고 항목은 활성 유지.
+    items[idx] = { ...it, quantity: remainder };
+  }
   writeItems(items);
 
   const db = loadExpiryDb();
   const row = db.find((r) => r.food_name === it.matched_db_key) ?? null;
   const co2pk = co2PerKg(row, it.name);
 
-  const grams = weight_g ?? estimateGrams(it.unit, it.quantity);
+  // 무게는 차감 개수 기준으로 추정 (전체 무게가 아님).
+  const grams = weight_g ?? estimateGrams(it.unit, removeQty);
 
   // EC-01: 음식물 처리(disposed)일 때 kg당 처리 비용 발생.
   const disposal_cost_krw =
@@ -174,8 +217,8 @@ export function consumeItem(
     item_id: it.id,
     name: it.matched_db_key ?? it.display_name,
     category: it.category,
-    quantity: it.quantity,
-    consumed_at: it.consumed_at!,
+    quantity: removeQty,
+    consumed_at,
     kind,
     co2_saved_kg: kind === "eaten" ? +((grams / 1000) * co2pk).toFixed(3) : 0,
     food_waste_g: grams,

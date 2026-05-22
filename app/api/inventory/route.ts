@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const created = [];
   for (const inp of inputs) {
     if (!inp.display_name || typeof inp.display_name !== "string") continue;
-    created.push(addItem(inp));
+    created.push(await addItem(inp));
   }
   return NextResponse.json({ created });
 }

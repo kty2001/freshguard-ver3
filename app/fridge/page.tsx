@@ -312,19 +312,36 @@ function Tile({ group, onClick }: { group: Group; onClick: () => void }) {
 }
 
 // UI-01 + FR-02/03: 클릭 시 수정 시트. 한 항목씩 '소비/처리/잘못 입력 삭제' 처리.
+// 수량 선택기 추가 — 한 항목에 quantity>1일 때 개수별로 처리 가능.
 function EditSheet({ group, onClose, onChanged }: {
   group: Group; onClose: () => void; onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // 항목별 처리 수량. 키 = item.id. 기본 1.
+  const [qtyMap, setQtyMap] = useState<Record<string, number>>(() =>
+    Object.fromEntries(group.items.map((it) => [it.id, 1]))
+  );
+
+  function setQty(itemId: string, max: number, next: number) {
+    const clamped = Math.min(max, Math.max(1, Math.round(next || 1)));
+    setQtyMap((s) => ({ ...s, [itemId]: clamped }));
+  }
 
   async function action(item: Item, kind: "eaten" | "disposed" | "mistake") {
-    if (kind === "mistake" && !confirm("잘못 입력한 항목으로 처리(삭제)할까요?\n에코 통계에는 반영되지 않습니다.")) return;
+    const qty = Math.min(item.quantity, Math.max(1, qtyMap[item.id] ?? 1));
+    const partial = qty < item.quantity;
+    if (kind === "mistake") {
+      const msg = partial
+        ? `${qty}${item.unit}만 잘못 입력으로 삭제할까요?\n남은 ${item.quantity - qty}${item.unit}은 그대로 유지됩니다.`
+        : "잘못 입력한 항목으로 처리(삭제)할까요?\n에코 통계에는 반영되지 않습니다.";
+      if (!confirm(msg)) return;
+    }
     setBusy(true); setErr(null);
     try {
       const r = await fetch("/api/inventory/consume", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: item.id, kind }),
+        body: JSON.stringify({ id: item.id, kind, qty }),
       });
       const j = await r.json();
       if (!r.ok && !j.ok) throw new Error(j.error ?? "처리 실패");
@@ -376,38 +393,96 @@ function EditSheet({ group, onClose, onChanged }: {
         </p>
 
         <div className="col" style={{ gap: 8 }}>
-          {group.items.map((it) => (
-            <div key={it.id} className="card flat" style={{ padding: 10 }}>
-              <div className="row spread">
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{it.quantity}{it.unit}</div>
-                  <div className="tiny">등록 {it.added_at.slice(0, 10)} · 만료 {it.expires_at.slice(0, 10)}</div>
+          {group.items.map((it) => {
+            const qty = Math.min(it.quantity, Math.max(1, qtyMap[it.id] ?? 1));
+            const remainder = it.quantity - qty;
+            return (
+              <div key={it.id} className="card flat" style={{ padding: 10 }}>
+                <div className="row spread">
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{it.quantity}{it.unit}</div>
+                    <div className="tiny">등록 {it.added_at.slice(0, 10)} · 만료 {it.expires_at.slice(0, 10)}</div>
+                  </div>
+                </div>
+
+                {/* 수량 선택: quantity>1일 때만 노출. 1이면 안 보여 단순 유지. */}
+                {it.quantity > 1 && (
+                  <div
+                    className="row"
+                    style={{ gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}
+                  >
+                    <span className="tiny" style={{ color: "var(--muted)" }}>처리 개수</span>
+                    <div className="row" style={{ gap: 4, alignItems: "center" }}>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        aria-label="개수 감소"
+                        disabled={busy || qty <= 1}
+                        onClick={() => setQty(it.id, it.quantity, qty - 1)}
+                        style={{ width: 34, height: 34, padding: 0, minHeight: 0, fontSize: 16 }}
+                      >−</button>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={it.quantity}
+                        value={qty}
+                        onChange={(e) => setQty(it.id, it.quantity, Number(e.target.value))}
+                        style={{
+                          width: 56, height: 34, textAlign: "center",
+                          background: "var(--panel-2)", color: "var(--text)",
+                          border: "1px solid var(--border)", borderRadius: 8,
+                          fontSize: 14, fontWeight: 600,
+                        }}
+                        aria-label={`처리 개수 (최대 ${it.quantity})`}
+                      />
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        aria-label="개수 증가"
+                        disabled={busy || qty >= it.quantity}
+                        onClick={() => setQty(it.id, it.quantity, qty + 1)}
+                        style={{ width: 34, height: 34, padding: 0, minHeight: 0, fontSize: 16 }}
+                      >+</button>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        disabled={busy || qty === it.quantity}
+                        onClick={() => setQty(it.id, it.quantity, it.quantity)}
+                        style={{ padding: "4px 8px", minHeight: 0, fontSize: 11 }}
+                      >전체</button>
+                    </div>
+                    <span className="tiny" style={{ marginLeft: "auto", color: "var(--muted)" }}>
+                      {remainder > 0 ? `남는 ${remainder}${it.unit}` : "전부 처리"}
+                    </span>
+                  </div>
+                )}
+
+                <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                  {/* FR-02 */}
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    onClick={() => action(it, "eaten")}
+                    style={{ flex: 1, minHeight: 38, fontSize: 13 }}
+                  >🍴 소비 {it.quantity > 1 ? `${qty}${it.unit}` : "(다 먹음)"}</button>
+                  <button
+                    className="btn ghost"
+                    disabled={busy}
+                    onClick={() => action(it, "disposed")}
+                    style={{ flex: 1, minHeight: 38, fontSize: 13 }}
+                  >🗑️ 음식물 처리 {it.quantity > 1 ? `${qty}${it.unit}` : ""}</button>
+                  {/* FR-03: 폐기 카운트와 분리된 '잘못 입력 삭제' */}
+                  <button
+                    className="btn danger"
+                    disabled={busy}
+                    onClick={() => action(it, "mistake")}
+                    style={{ flex: 1, minHeight: 38, fontSize: 13 }}
+                  >✏️ 잘못 입력 삭제 {it.quantity > 1 ? `${qty}${it.unit}` : ""}</button>
                 </div>
               </div>
-              <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-                {/* FR-02 */}
-                <button
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => action(it, "eaten")}
-                  style={{ flex: 1, minHeight: 38, fontSize: 13 }}
-                >🍴 소비(다 먹음)</button>
-                <button
-                  className="btn ghost"
-                  disabled={busy}
-                  onClick={() => action(it, "disposed")}
-                  style={{ flex: 1, minHeight: 38, fontSize: 13 }}
-                >🗑️ 음식물 처리</button>
-                {/* FR-03: 폐기 카운트와 분리된 '잘못 입력 삭제' */}
-                <button
-                  className="btn danger"
-                  disabled={busy}
-                  onClick={() => action(it, "mistake")}
-                  style={{ flex: 1, minHeight: 38, fontSize: 13 }}
-                >✏️ 잘못 입력 삭제</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {err && <p style={{ color: "var(--danger)", marginTop: 10 }}>오류: {err}</p>}

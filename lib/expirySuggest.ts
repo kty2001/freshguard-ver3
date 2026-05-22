@@ -1,11 +1,11 @@
-// ver3: 직접 입력 식재료에 대한 유통기한 추정 — 원격 VLM 서버 위임.
-// 3단계 폴백은 ver2와 동일: DB → 원격 VLM → 기본값.
+// ver3: 직접 입력 식재료에 대한 유통기한 추정.
+// 정책: 로컬 DB(expiry_db_utf8.csv)는 더 이상 유통기한 산정에 사용하지 않음.
+// 항상 원격 VLM(LLM의 사전 지식)에 위임. LLM 실패 시에만 기본값으로 폴백.
 
 import type { StorageType } from "./types";
-import { matchExpiry } from "./expiryDb";
 import { suggestExpiry as remoteSuggestExpiry } from "./vlmServer";
 
-export type SuggestSource = "db" | "llm" | "default" | "rejected";
+export type SuggestSource = "llm" | "default" | "rejected";
 
 export interface ExpirySuggestion {
   query: string;
@@ -53,24 +53,7 @@ export async function suggestExpiry(query: string): Promise<ExpirySuggestion> {
     };
   }
 
-  // 1) DB hit
-  const m = matchExpiry(trimmed);
-  if (m.row) {
-    return {
-      query: trimmed,
-      name: m.row.food_name,
-      category: m.row.category,
-      storage_type: m.row.storage_type,
-      days: m.row.expiry_days_default,
-      note: m.row.note || undefined,
-      source: "db",
-      matched_db_key: m.row.food_name,
-      is_food: true,
-      elapsed_ms: Date.now() - t0,
-    };
-  }
-
-  // 2) 원격 VLM 추정
+  // 1) 원격 VLM (LLM 사전 지식) — 유일한 추정 소스.
   try {
     const r = await remoteSuggestExpiry(trimmed);
     // LM-02: 서버가 음식 아님으로 판정한 경우.
@@ -106,14 +89,14 @@ export async function suggestExpiry(query: string): Promise<ExpirySuggestion> {
     // 서버 호출 실패 → 기본값으로 폴백.
   }
 
-  // 3) fallback
+  // 2) LLM 호출 실패 또는 유효하지 않은 응답 → 기본값.
   return {
     query: trimmed,
     name: trimmed,
     storage_type: "냉장",
     days: 7,
     source: "default",
-    note: "기본값",
+    note: "AI 추정 실패 — 기본값 7일",
     is_food: true,
     elapsed_ms: Date.now() - t0,
   };
