@@ -9,11 +9,6 @@ type EnrichedItem = {
   quantity: number;
   unit: string;
   confidence: number;
-  matched: boolean;
-  db_food_name: string | null;
-  expiry_days_default: number | null;
-  category: string | null;
-  storage_type: string | null;
 };
 
 type ExpItem = {
@@ -87,7 +82,8 @@ export default function Home() {
     setLoading(true);
     try {
       // 같은 라벨은 한 번만 저장하되, 개수는 사용자 입력 합산.
-      const merged = new Map<string, { display_name: string; quantity: number; category?: string }>();
+      // 유통기한·카테고리는 저장 시점에 서버가 LLM에 위임해 채움.
+      const merged = new Map<string, { display_name: string; quantity: number }>();
       for (const it of items) {
         const key = it.label.trim();
         if (!key) continue;
@@ -96,7 +92,6 @@ export default function Home() {
         else merged.set(key, {
           display_name: key,
           quantity: Math.max(1, Math.round(it.quantity)),
-          category: it.category ?? undefined,
         });
       }
       const r = await fetch("/api/inventory", {
@@ -223,7 +218,7 @@ export default function Home() {
           <div className="col" style={{ gap: 8 }}>
             {items.map((it, i) => (
               <div key={i} className="list-item">
-                <div className="ico">{foodEmoji(it.db_food_name ?? it.label, it.category ?? undefined)}</div>
+                <div className="ico">{foodEmoji(it.label)}</div>
                 <div className="meta">
                   <input
                     className="input"
@@ -246,11 +241,7 @@ export default function Home() {
                       onClick={() => updateItem(i, { quantity: Math.min(999, it.quantity + 1) })}
                       style={{ width: 32, minHeight: 32, padding: 0, fontSize: 16 }}
                     >＋</button>
-                    {it.matched ? (
-                      <span className="badge ok" style={{ marginLeft: "auto" }}>{it.db_food_name} · {it.expiry_days_default}일</span>
-                    ) : (
-                      <span className="badge warn" style={{ marginLeft: "auto" }}>DB 미수록 · 7일 기본</span>
-                    )}
+                    <span className="badge warn" style={{ marginLeft: "auto" }}>저장 시 AI가 유통기한 추정</span>
                   </div>
                 </div>
                 <button className="icon-btn" onClick={() => removeItem(i)} aria-label="remove">
