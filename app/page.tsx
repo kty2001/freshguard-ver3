@@ -3,6 +3,18 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { foodEmoji } from "@/lib/foodIcon";
 import ManualAddCard from "./_components/ManualAddCard";
+import WebcamCapture from "./_components/WebcamCapture";
+
+// 휴대폰이면 OS 카메라(<input capture>), 노트북/데스크톱이면 웹캠 모달로 분기.
+function isMobileDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true;
+  // userAgent 위장 대비: 터치 + 좁은 화면이면 모바일로 간주.
+  return (
+    window.matchMedia?.("(pointer: coarse)").matches &&
+    window.matchMedia?.("(max-width: 900px)").matches
+  );
+}
 
 type EnrichedItem = {
   label: string;
@@ -32,6 +44,10 @@ export default function Home() {
   const [saved, setSaved] = useState(0);
   const [expiring, setExpiring] = useState<ExpItem[]>([]);
   const [counts, setCounts] = useState({ total: 0, soon: 0 });
+  const [webcamOpen, setWebcamOpen] = useState(false);
+  // 마운트 후 환경 감지 (SSR 안전).
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => { setIsMobile(isMobileDevice()); }, []);
 
   async function loadExpiring() {
     const [r1, r2] = await Promise.all([
@@ -66,15 +82,26 @@ export default function Home() {
   }
 
   // CA-01: 업로드/촬영 직후 자동 인식 시작.
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  function acceptFile(f: File) {
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setItems([]);
     setError(null);
     setSaved(0);
     recognizeBuffer(f);
+  }
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    acceptFile(f);
+  }
+
+  // 카메라로 찍기:
+  //  - 휴대폰: <input capture="environment">로 OS 카메라 호출
+  //  - 노트북/데스크톱: getUserMedia 기반 웹캠 모달
+  function onCameraClick() {
+    if (isMobile) cameraRef.current?.click();
+    else setWebcamOpen(true);
   }
 
   async function saveAll() {
@@ -179,7 +206,7 @@ export default function Home() {
 
         {!preview && (
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn lg" onClick={() => cameraRef.current?.click()}>
+            <button className="btn lg" onClick={onCameraClick}>
               📷 카메라로 찍기
             </button>
             <button className="btn lg ghost" onClick={() => fileRef.current?.click()}>
@@ -292,6 +319,12 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      <WebcamCapture
+        open={webcamOpen}
+        onClose={() => setWebcamOpen(false)}
+        onCapture={acceptFile}
+      />
     </>
   );
 }

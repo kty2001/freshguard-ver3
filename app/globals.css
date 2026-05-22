@@ -250,6 +250,65 @@ button { font: inherit; }
 .alert-row.push-style.is-urgent .alert-message { color: var(--warn); font-weight: 600; }
 .alert-row.push-style.is-over   .alert-message { color: var(--danger); font-weight: 700; }
 
+/* === 웹캠 촬영 모달 (노트북/데스크톱) === */
+.webcam-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 110;
+  animation: alert-fade 0.12s ease-out;
+}
+.webcam-modal {
+  width: 100%;
+  max-width: 760px;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.webcam-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.webcam-title { font-weight: 600; font-size: 15px; }
+.webcam-body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+.webcam-video {
+  width: 100%;
+  max-height: 70vh;
+  display: block;
+  background: #000;
+}
+.webcam-error {
+  color: var(--danger);
+  padding: 24px;
+  margin: 0;
+  text-align: center;
+}
+.webcam-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.webcam-actions .btn { flex: 1; }
+
 .screen h1 {
   font-size: 22px;
   margin: 6px 0 14px;
