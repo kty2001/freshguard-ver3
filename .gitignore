@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+dist
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+data/inventory.json
+data/consume_log.json
+data/budget.json
+tsconfig.tsbuildinfo
+.claude/
+

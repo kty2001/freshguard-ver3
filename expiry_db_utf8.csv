@@ -1,0 +1,68 @@
+﻿source,food_name,category,storage_type,expiry_days_legacy,expiry_days_reference,expiry_days_default,note
+식약처 고시 제2022-31호,두부,두류·콩류,냉장,17,23,20,4품목 평균
+식약처 고시 제2022-31호,가공유,달걀·유제품,냉장,16,24,20,1품목
+식약처 고시 제2022-31호,과채주스,음료류,냉장,20,35,28,1품목
+식약처 고시 제2022-31호,발효유,달걀·유제품,냉장,18,32,26,6품목 평균
+식약처 고시 제2022-31호,유산균음료,음료류,냉장,18,26,22,3품목 평균
+식약처 고시 제2022-31호,빵류,가공식품,실온,20,31,25,4품목 평균
+식약처 고시 제2022-31호,과자류,가공식품,실온,45,81,70,1품목
+식약처 고시 제2022-31호,햄,육류 가공,냉장,38,57,48,2품목 평균
+식약처 고시 제2022-31호,프레스햄,육류 가공,냉장,43,66,55,3품목 평균
+식약처 고시 제2022-31호,소시지,육류 가공,냉장,39,56,47,4품목 평균
+식약처 고시 제2022-31호,어묵,가공식품,냉장,29,42,35,6품목 평균
+USDA FoodKeeper,달걀,달걀·유제품,냉장,25,35,25,산란일 기준
+USDA FoodKeeper,우유,달걀·유제품,냉장,7,14,10,개봉 전 기준
+USDA FoodKeeper,버터,달걀·유제품,냉장,30,90,60,개봉 전
+USDA FoodKeeper,치즈(슬라이스),달걀·유제품,냉장,14,28,21,개봉 전
+USDA FoodKeeper,돼지고기(생),육류,냉장,2,4,2,당일 구매 기준
+USDA FoodKeeper,닭고기(생),육류,냉장,1,3,2,당일 구매 기준
+USDA FoodKeeper,소고기(생),육류,냉장,3,5,3,당일 구매 기준
+USDA FoodKeeper,대파,채소류,냉장,7,21,14,손질 전
+USDA FoodKeeper,당근,채소류,냉장,14,30,21,세척 전
+USDA FoodKeeper,시금치,채소류,냉장,3,7,5,
+USDA FoodKeeper,브로콜리,채소류,냉장,3,7,5,
+USDA FoodKeeper,버섯,채소류,냉장,3,7,5,
+USDA FoodKeeper,토마토,채소류,실온,4,7,5,냉장 보관 시 +3일
+USDA FoodKeeper,양파,채소류,실온,14,60,30,서늘·건조 보관
+USDA FoodKeeper,감자,채소류,실온,14,42,21,서늘·건조 보관
+USDA FoodKeeper,사과,과일류,냉장,21,60,30,
+USDA FoodKeeper,딸기,과일류,냉장,2,5,3,
+USDA FoodKeeper,바나나,과일류,실온,4,7,5,숙성도에 따라 상이
+USDA FoodKeeper,생선(흰살),해산물,냉장,1,2,1,당일 사용 권장
+USDA FoodKeeper,새우(생),해산물,냉장,1,2,1,당일 사용 권장
+USDA FoodKeeper,된장(개봉 후),조미류,냉장,60,180,90,제조사별 상이
+USDA FoodKeeper,고추장(개봉 후),조미류,냉장,60,180,90,제조사별 상이
+USDA FoodKeeper,간장(개봉 후),조미류,실온,180,365,180,
+USDA FoodKeeper,두부면·곤약,가공식품,냉장,10,20,14,개봉 전 기준
+USDA FoodKeeper,오이,채소류,냉장,5,10,7,세척 전
+USDA FoodKeeper,양상추,채소류,냉장,5,10,7,
+USDA FoodKeeper,양배추,채소류,냉장,14,30,21,
+USDA FoodKeeper,애호박,채소류,냉장,5,7,7,
+USDA FoodKeeper,피망,채소류,냉장,7,14,10,
+USDA FoodKeeper,파프리카,채소류,냉장,7,14,10,
+USDA FoodKeeper,마늘,채소류,실온,30,90,60,서늘·건조 보관
+USDA FoodKeeper,생강,채소류,냉장,14,21,14,
+USDA FoodKeeper,가지,채소류,냉장,5,7,5,
+USDA FoodKeeper,청양고추,채소류,냉장,7,14,10,
+USDA FoodKeeper,상추,채소류,냉장,5,10,7,
+USDA FoodKeeper,깻잎,채소류,냉장,5,10,7,
+USDA FoodKeeper,콩나물,채소류,냉장,2,4,3,
+USDA FoodKeeper,숙주,채소류,냉장,2,4,3,
+USDA FoodKeeper,오렌지,과일류,냉장,14,30,21,
+USDA FoodKeeper,귤,과일류,냉장,7,21,14,
+USDA FoodKeeper,포도,과일류,냉장,5,14,7,
+USDA FoodKeeper,복숭아,과일류,냉장,3,7,5,숙성 후
+USDA FoodKeeper,수박,과일류,냉장,7,14,10,자르기 전
+USDA FoodKeeper,블루베리,과일류,냉장,5,10,7,
+USDA FoodKeeper,레몬,과일류,냉장,14,30,21,
+USDA FoodKeeper,연어,해산물,냉장,1,2,1,당일 사용 권장
+USDA FoodKeeper,오징어,해산물,냉장,1,2,1,당일 사용 권장
+USDA FoodKeeper,요거트,달걀·유제품,냉장,7,14,10,개봉 전
+USDA FoodKeeper,베이컨,육류 가공,냉장,7,14,10,개봉 전
+USDA FoodKeeper,참치캔,가공식품,실온,365,1095,730,개봉 전
+USDA FoodKeeper,라면,가공식품,실온,150,210,180,개봉 전
+USDA FoodKeeper,쌀,곡류,실온,180,365,180,서늘·건조
+USDA FoodKeeper,김치,발효식품,냉장,30,90,60,개봉 후
+USDA FoodKeeper,식초,조미류,실온,365,1095,730,
+USDA FoodKeeper,올리브유,조미류,실온,180,540,365,개봉 후
+USDA FoodKeeper,참기름,조미류,실온,180,365,180,개봉 후
