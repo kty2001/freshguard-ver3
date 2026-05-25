@@ -1,0 +1,15 @@
+[
+  {
+    "id": "8b1ee3d9-b4ef-4eac-9b24-ef90d8ad9778",
+    "item_id": "140d028e-4408-4ebe-bf59-2d17b990ff17",
+    "name": "두부",
+    "category": "기타",
+    "quantity": 1,
+    "consumed_at": "2026-05-25T03:30:12.118Z",
+    "kind": "disposed",
+    "co2_saved_kg": 0,
+    "food_waste_g": 300,
+    "money_saved_krw": 0,
+    "disposal_cost_krw": 180
+  }
+]
