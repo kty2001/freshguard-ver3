@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
         label,
         quantity: Math.max(1, Math.round(it.quantity || 1)),
         unit: it.unit || "개",
-        confidence: it.confidence ?? 0.7,
       };
     });
 
@@ -46,7 +45,6 @@ export async function POST(req: NextRequest) {
       const cur = dedup.get(key);
       if (cur) {
         cur.quantity += it.quantity;
-        cur.confidence = Math.max(cur.confidence, it.confidence);
       } else {
         dedup.set(key, { ...it });
       }

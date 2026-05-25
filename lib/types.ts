@@ -22,7 +22,6 @@ export interface InventoryItem {
   added_at: string;
   expires_at: string;
   expiry_days_used: number;
-  source_confidence?: number;
   is_consumed: boolean;
   consumed_at?: string;
   matched_db_key?: string;
@@ -72,7 +71,6 @@ export interface RecognizedItem {
   label: string;
   quantity: number;
   unit: string;
-  confidence: number;
 }
 
 export interface BudgetEntry {

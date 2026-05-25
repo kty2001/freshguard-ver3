@@ -20,7 +20,6 @@ type EnrichedItem = {
   label: string;
   quantity: number;
   unit: string;
-  confidence: number;
 };
 
 type ExpItem = {
