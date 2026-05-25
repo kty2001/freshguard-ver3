@@ -6,9 +6,31 @@ import { co2PerKg, loadExpiryDb, matchExpiry } from "./expiryDb";
 import { suggestExpiry } from "./expirySuggest";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const ITEMS_PATH = path.join(DATA_DIR, "inventory.json");
-const LOG_PATH = path.join(DATA_DIR, "consume_log.json");
-const BUDGET_PATH = path.join(DATA_DIR, "budget.json");
+const USERS_DIR = path.join(DATA_DIR, "users");
+
+export const DEFAULT_USER_ID = "default";
+
+function sanitizeUserId(input?: string | null): string {
+  const raw = (input ?? "").trim();
+  if (!raw) return DEFAULT_USER_ID;
+  // 영문/숫자/_ -만 허용. 그 외는 _ 로 치환. 너무 길면 자름.
+  const safe = raw.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 48);
+  return safe || DEFAULT_USER_ID;
+}
+
+function userDir(userId?: string | null): string {
+  return path.join(USERS_DIR, sanitizeUserId(userId));
+}
+
+function itemsPath(userId?: string | null): string {
+  return path.join(userDir(userId), "inventory.json");
+}
+function logPath(userId?: string | null): string {
+  return path.join(userDir(userId), "consume_log.json");
+}
+function budgetPath(userId?: string | null): string {
+  return path.join(userDir(userId), "budget.json");
+}
 
 // EC-01: 음식물 처리기 평균 가격 (kg당). 환경부 음식물쓰레기 종량제 평균 ~ 600원/kg.
 export const DISPOSAL_COST_PER_KG = Number(
@@ -16,27 +38,27 @@ export const DISPOSAL_COST_PER_KG = Number(
 );
 const FOOD_VALUE_PER_KG = Number(process.env.FOOD_VALUE_PER_KG ?? 6000);
 
-function ensure() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(ITEMS_PATH)) fs.writeFileSync(ITEMS_PATH, "[]", "utf8");
-  if (!fs.existsSync(LOG_PATH)) fs.writeFileSync(LOG_PATH, "[]", "utf8");
-  if (!fs.existsSync(BUDGET_PATH)) fs.writeFileSync(BUDGET_PATH, "[]", "utf8");
+function ensure(userId?: string | null) {
+  const dir = userDir(userId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(itemsPath(userId))) fs.writeFileSync(itemsPath(userId), "[]", "utf8");
+  if (!fs.existsSync(logPath(userId))) fs.writeFileSync(logPath(userId), "[]", "utf8");
+  if (!fs.existsSync(budgetPath(userId))) fs.writeFileSync(budgetPath(userId), "[]", "utf8");
 }
 
-export function readItems(): InventoryItem[] {
-  ensure();
-  return JSON.parse(fs.readFileSync(ITEMS_PATH, "utf8"));
+export function readItems(userId?: string | null): InventoryItem[] {
+  ensure(userId);
+  return JSON.parse(fs.readFileSync(itemsPath(userId), "utf8"));
 }
 
-function writeItems(items: InventoryItem[]) {
-  ensure();
-  fs.writeFileSync(ITEMS_PATH, JSON.stringify(items, null, 2), "utf8");
+function writeItems(items: InventoryItem[], userId?: string | null) {
+  ensure(userId);
+  fs.writeFileSync(itemsPath(userId), JSON.stringify(items, null, 2), "utf8");
 }
 
-export function readLogs(): ConsumeLog[] {
-  ensure();
-  const raw: any[] = JSON.parse(fs.readFileSync(LOG_PATH, "utf8"));
-  // 마이그레이션: 기존 로그에 kind/disposal_cost가 없으면 보강.
+export function readLogs(userId?: string | null): ConsumeLog[] {
+  ensure(userId);
+  const raw: any[] = JSON.parse(fs.readFileSync(logPath(userId), "utf8"));
   return raw.map((l) => ({
     kind: (l.kind as RemoveKind) ?? "eaten",
     disposal_cost_krw: l.disposal_cost_krw ?? 0,
@@ -44,19 +66,19 @@ export function readLogs(): ConsumeLog[] {
   })) as ConsumeLog[];
 }
 
-function writeLogs(logs: ConsumeLog[]) {
-  ensure();
-  fs.writeFileSync(LOG_PATH, JSON.stringify(logs, null, 2), "utf8");
+function writeLogs(logs: ConsumeLog[], userId?: string | null) {
+  ensure(userId);
+  fs.writeFileSync(logPath(userId), JSON.stringify(logs, null, 2), "utf8");
 }
 
-export function readBudget(): BudgetEntry[] {
-  ensure();
-  return JSON.parse(fs.readFileSync(BUDGET_PATH, "utf8"));
+export function readBudget(userId?: string | null): BudgetEntry[] {
+  ensure(userId);
+  return JSON.parse(fs.readFileSync(budgetPath(userId), "utf8"));
 }
 
-function writeBudget(entries: BudgetEntry[]) {
-  ensure();
-  fs.writeFileSync(BUDGET_PATH, JSON.stringify(entries, null, 2), "utf8");
+export function writeBudget(entries: BudgetEntry[], userId?: string | null) {
+  ensure(userId);
+  fs.writeFileSync(budgetPath(userId), JSON.stringify(entries, null, 2), "utf8");
 }
 
 export interface AddItemInput {
@@ -70,10 +92,8 @@ export interface AddItemInput {
   price_krw?: number;
 }
 
-// ver3 정책: 유통기한·카테고리·보관법은 로컬 DB를 사용하지 않고 LLM에 위임.
-// manual_expiry_days가 입력되면 그대로 사용, 아니면 suggestExpiry로 LLM 호출.
-export async function addItem(input: AddItemInput): Promise<InventoryItem> {
-  const items = readItems();
+export async function addItem(input: AddItemInput, userId?: string | null): Promise<InventoryItem> {
+  const items = readItems(userId);
 
   let days: number;
   let category: string | undefined;
@@ -84,7 +104,6 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
     days = input.manual_expiry_days;
     category = input.category;
   } else {
-    // 1) 로컬 DB에서 먼저 조회 (즉시 응답, VLM 호출 없음).
     const dbMatch = matchExpiry(input.display_name);
     if (dbMatch.matched && dbMatch.row && dbMatch.row.expiry_days_default > 0) {
       days = dbMatch.row.expiry_days_default;
@@ -92,7 +111,6 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
       storage_type = (dbMatch.row.storage_type as StorageType) ?? "냉장";
       if (dbMatch.row.food_name) normalized_name = dbMatch.row.food_name;
     } else {
-      // 2) DB에 없는 경우에만 LLM에 위임.
       const r = await suggestExpiry(input.display_name);
       days = r.days > 0 ? r.days : 7;
       category = r.category ?? input.category;
@@ -104,7 +122,6 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
   const added = input.added_at ? new Date(input.added_at) : new Date();
   const exp = new Date(added.getTime() + days * 24 * 60 * 60 * 1000);
 
-  // FR-04: 카테고리 없는 항목이 '전체' 필터에서 누락 → '기타' 폴백 보장.
   category = category ?? "기타";
 
   const item: InventoryItem = {
@@ -124,11 +141,10 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
   };
 
   items.push(item);
-  writeItems(items);
+  writeItems(items, userId);
 
-  // EC-02 가계부: 금액 입력이 있으면 함께 기록.
   if (typeof input.price_krw === "number" && input.price_krw > 0) {
-    const entries = readBudget();
+    const entries = readBudget(userId);
     entries.push({
       id: randomUUID(),
       item_id: item.id,
@@ -136,7 +152,7 @@ export async function addItem(input: AddItemInput): Promise<InventoryItem> {
       amount_krw: Math.round(input.price_krw),
       added_at: item.added_at,
     });
-    writeBudget(entries);
+    writeBudget(entries, userId);
   }
 
   return item;
@@ -150,10 +166,8 @@ function defaultUnit(name: string): string {
   return "개";
 }
 
-// FR-03: '폐기'와 '잘못 입력 삭제' 분리. 'mistake'는 로그 미적재.
-// qty 미지정 시 전체 삭제. 지정 시 해당 개수만 차감(0 이하 되면 삭제).
-export function removeItem(id: string, qty?: number): boolean {
-  const items = readItems();
+export function removeItem(id: string, qty?: number, userId?: string | null): boolean {
+  const items = readItems(userId);
   const idx = items.findIndex((i) => i.id === id);
   if (idx < 0) return false;
   if (qty == null) {
@@ -166,19 +180,18 @@ export function removeItem(id: string, qty?: number): boolean {
       items[idx] = { ...items[idx], quantity: items[idx].quantity - remove };
     }
   }
-  writeItems(items);
+  writeItems(items, userId);
   return true;
 }
 
-// FR-02: 소비/처리 분리 → kind='eaten' | 'disposed' | 'mistake'
-// qty 미지정 시 전체 소비(기존 동작). 지정 시 그 개수만 차감하고 로그도 그 개수 기준.
 export function consumeItem(
   id: string,
   kind: RemoveKind = "eaten",
   weight_g?: number,
-  qty?: number
+  qty?: number,
+  userId?: string | null
 ): ConsumeLog | null {
-  const items = readItems();
+  const items = readItems(userId);
   const idx = items.findIndex((i) => i.id === id && !i.is_consumed);
   if (idx < 0) return null;
   const it = items[idx];
@@ -193,7 +206,7 @@ export function consumeItem(
     } else {
       items[idx] = { ...it, quantity: remainder };
     }
-    writeItems(items);
+    writeItems(items, userId);
     return null;
   }
 
@@ -201,23 +214,19 @@ export function consumeItem(
   if (remainder <= 0) {
     items[idx] = { ...it, is_consumed: true, consumed_at };
   } else {
-    // 부분 소비: 수량만 줄이고 항목은 활성 유지.
     items[idx] = { ...it, quantity: remainder };
   }
-  writeItems(items);
+  writeItems(items, userId);
 
   const db = loadExpiryDb();
   const row = db.find((r) => r.food_name === it.matched_db_key) ?? null;
   const co2pk = co2PerKg(row, it.name);
 
-  // 무게는 차감 개수 기준으로 추정 (전체 무게가 아님).
   const grams = weight_g ?? estimateGrams(it.unit, removeQty);
 
-  // EC-01: 음식물 처리(disposed)일 때 kg당 처리 비용 발생.
   const disposal_cost_krw =
     kind === "disposed" ? Math.round((grams / 1000) * DISPOSAL_COST_PER_KG) : 0;
 
-  // 절감 금액은 잘 먹은 만큼만 적립.
   const money_saved_krw =
     kind === "eaten" ? Math.round((grams / 1000) * FOOD_VALUE_PER_KG) : 0;
 
@@ -235,9 +244,9 @@ export function consumeItem(
     disposal_cost_krw,
   };
 
-  const logs = readLogs();
+  const logs = readLogs(userId);
   logs.push(log);
-  writeLogs(logs);
+  writeLogs(logs, userId);
   return log;
 }
 
@@ -264,8 +273,8 @@ export function daysUntil(iso: string): number {
   return Math.ceil(ms / (24 * 60 * 60 * 1000));
 }
 
-export function expiringSoon(threshold = 3): InventoryItem[] {
-  return readItems()
+export function expiringSoon(threshold = 3, userId?: string | null): InventoryItem[] {
+  return readItems(userId)
     .filter((i) => !i.is_consumed && daysUntil(i.expires_at) <= threshold)
     .sort((a, b) => daysUntil(a.expires_at) - daysUntil(b.expires_at));
 }
@@ -316,8 +325,8 @@ function buildMilestones(
   ];
 }
 
-export function ecoSummary(): EcoSummary {
-  const logs = readLogs();
+export function ecoSummary(userId?: string | null): EcoSummary {
+  const logs = readLogs(userId);
   const eaten = logs.filter((l) => l.kind === "eaten");
   const disposed = logs.filter((l) => l.kind === "disposed");
 
@@ -370,7 +379,7 @@ export function ecoSummary(): EcoSummary {
   const co2_saved_kg = +co2.toFixed(2);
   const streak = computeStreak(logs);
 
-  const budget_spent_krw = readBudget().reduce((s, b) => s + b.amount_krw, 0);
+  const budget_spent_krw = readBudget(userId).reduce((s, b) => s + b.amount_krw, 0);
 
   return {
     total_consumed_items: eaten.length,
@@ -385,4 +394,13 @@ export function ecoSummary(): EcoSummary {
     milestones: buildMilestones(eaten.length, food_waste_kg, co2_saved_kg, streak),
     streak_days: streak,
   };
+}
+
+export function clearInventory(userId?: string | null) {
+  ensure(userId);
+  fs.writeFileSync(itemsPath(userId), "[]", "utf8");
+}
+export function clearLogs(userId?: string | null) {
+  ensure(userId);
+  fs.writeFileSync(logPath(userId), "[]", "utf8");
 }

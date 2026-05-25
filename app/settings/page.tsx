@@ -1,9 +1,36 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [userPhone, setUserPhone] = useState<string>("");
+
+  useEffect(() => {
+    // fg_user 쿠키 읽기 (httpOnly 가 아니라 클라이언트에서 접근 가능).
+    const m = document.cookie.match(/(?:^|; )fg_user=([^;]+)/);
+    if (m) setUserPhone(decodeURIComponent(m[1]));
+  }, []);
+
+  function formatPhone(d: string): string {
+    if (d.length === 11 && d.startsWith("010")) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    return d;
+  }
+
+  async function logout() {
+    if (!confirm("로그아웃하시겠습니까?\n같은 번호로 다시 로그인하면 데이터가 복원됩니다.")) return;
+    setBusy(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function clear(scope: "inventory" | "logs" | "all") {
     const txt =
@@ -23,6 +50,19 @@ export default function SettingsPage() {
     <>
       <h1>설정</h1>
       <p className="muted" style={{ marginTop: 0 }}>데이터 관리를 할 수 있어요.</p>
+
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>👤 계정</h2>
+        <div className="row spread" style={{ padding: "6px 0 12px" }}>
+          <span className="muted" style={{ fontSize: 13 }}>로그인 번호</span>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>
+            {userPhone ? formatPhone(userPhone) : "—"}
+          </span>
+        </div>
+        <button className="btn ghost" disabled={busy} onClick={logout} style={{ width: "100%" }}>
+          🔓 로그아웃
+        </button>
+      </div>
 
       {/* UI-03: 'AI 모델', '데이터 현황' 항목 제거 (사용자 혼란 방지) */}
 

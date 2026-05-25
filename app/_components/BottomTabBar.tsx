@@ -12,6 +12,8 @@ const TABS: { href: string; label: string; icon: string; match: RegExp }[] = [
 
 export default function BottomTabBar() {
   const path = usePathname() || "/";
+  // 로그인 페이지에서는 탭바 숨김.
+  if (path === "/login") return null;
   return (
     <nav className="tabbar" aria-label="primary">
       {TABS.map((t) => {

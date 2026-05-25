@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FreshGuard</string>
+
+    <!-- Login -->
+    <string name="login_subtitle">휴대폰 번호로 로그인</string>
+    <string name="login_label_phone">휴대폰 번호</string>
+    <string name="login_hint_phone">예: 010-1234-5678</string>
+    <string name="login_send_code">로그인</string>
+    <string name="login_help">번호는 안내·로그인 식별 용도로만 사용됩니다.</string>
+    <string name="login_verify_title">인증번호 입력</string>
+    <string name="login_label_code">6자리 인증번호</string>
+    <string name="login_hint_code">000000</string>
+    <string name="login_verify">확인</string>
+    <string name="login_back">번호 변경</string>
+    <string name="login_resend">재전송</string>
+    <string name="login_invalid_phone">올바른 휴대폰 번호를 입력하세요</string>
+    <string name="login_invalid_code">인증번호를 입력하세요</string>
+    <string name="login_send_failed">전송 실패: %1$s</string>
+    <string name="login_verify_failed">확인 실패: %1$s</string>
+    <string name="login_code_sent">인증번호를 발송했습니다</string>
+    <string name="login_code_resent">인증번호를 다시 발송했습니다</string>
+    <string name="login_dev_code_filled">(데모) 인증번호 %1$s — 자동 입력됨</string>
+
+    <!-- Main / Menu -->
+    <string name="error_load_failed">페이지를 불러오지 못했습니다.\n%1$s</string>
+    <string name="retry">다시 시도</string>
+    <string name="camera_permission_denied">카메라 권한이 거부되어 촬영할 수 없어요.</string>
+    <string name="file_chooser_title">사진 선택</string>
+    <string name="menu_logout">로그아웃</string>
+    <string name="menu_reload">새로고침</string>
+    <string name="logout_confirm_title">로그아웃</string>
+    <string name="logout_confirm_message">로그아웃하시겠습니까? 데이터는 서버에 그대로 남아있고, 다시 같은 번호로 로그인하면 복원됩니다.</string>
+    <string name="logout_cancel">취소</string>
+    <string name="logout_ok">로그아웃</string>
+</resources>
