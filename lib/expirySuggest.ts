@@ -4,8 +4,9 @@
 
 import type { StorageType } from "./types";
 import { suggestExpiry as remoteSuggestExpiry } from "./vlmServer";
+import { findInAllowlist } from "./foodAllowlist";
 
-export type SuggestSource = "llm" | "default" | "rejected";
+export type SuggestSource = "db" | "llm" | "default" | "rejected";
 
 export interface ExpirySuggestion {
   query: string;
@@ -53,11 +54,40 @@ export async function suggestExpiry(query: string): Promise<ExpirySuggestion> {
     };
   }
 
-  // 1) 원격 VLM (LLM 사전 지식) — 유일한 추정 소스.
+  // 0) 클라이언트 화이트리스트 — VLM이 자주 식품 아님으로 오판하는 외국·가공·특수 식품 우선 처리.
+  //    여기에 매칭되면 VLM 호출을 건너뛰고 즉시 식품으로 인정.
+  const allowlisted = findInAllowlist(trimmed);
+  if (allowlisted) {
+    return {
+      query: trimmed,
+      name: trimmed,
+      category: allowlisted.category,
+      storage_type: allowlisted.storage_type,
+      days: allowlisted.days,
+      source: "db",
+      is_food: true,
+      elapsed_ms: Date.now() - t0,
+    };
+  }
+
+  // 1) 원격 VLM (LLM 사전 지식).
   try {
     const r = await remoteSuggestExpiry(trimmed);
-    // LM-02: 서버가 음식 아님으로 판정한 경우.
+    // LM-02: 서버가 음식 아님으로 판정한 경우 — 화이트리스트 재확인 후 거부.
     if (r.is_food === false) {
+      const fallback = findInAllowlist(trimmed);
+      if (fallback) {
+        return {
+          query: trimmed,
+          name: trimmed,
+          category: fallback.category,
+          storage_type: fallback.storage_type,
+          days: fallback.days,
+          source: "db",
+          is_food: true,
+          elapsed_ms: Date.now() - t0,
+        };
+      }
       return {
         query: trimmed,
         name: trimmed,
