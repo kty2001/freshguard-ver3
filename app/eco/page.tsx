@@ -70,7 +70,8 @@ export default function EcoPage() {
   const maxWeek = Math.max(1, ...s.weekly.map((d) => Math.max(d.consumed, d.disposed)));
   const maxCat = Math.max(1, ...s.by_category.map((c) => c.count));
   const achievedCount = s.milestones.filter((m) => m.achieved).length;
-  const netSaved = s.money_saved_krw - s.disposal_cost_krw;
+  // 순 절약 = 잘 먹어서 버리지 않은 양에 대해 절감된 처리비 (kg당 180원 × 절감 무게).
+  const netSaved = s.money_saved_krw;
 
   return (
     <>
@@ -91,7 +92,12 @@ export default function EcoPage() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>💰 금액 요약</h2>
         <div className="col" style={{ gap: 0 }}>
-          <Field label="잘 먹어서 절약한 금액" value={`${s.money_saved_krw.toLocaleString()}원`} tone="ok" />
+          <Field
+            label="잘 먹어서 절약한 금액"
+            value={`${s.money_saved_krw.toLocaleString()}원`}
+            tone="ok"
+            hint={`kg당 ${process.env.NEXT_PUBLIC_DISPOSAL_PRICE ?? "180"}원 × 절감 무게`}
+          />
           <Field
             label="음식물 처리 비용"
             value={`${s.disposal_cost_krw.toLocaleString()}원`}
@@ -101,7 +107,7 @@ export default function EcoPage() {
           {budget.total > 0 && (
             <Field label="가계부 누적 지출" value={`${budget.total.toLocaleString()}원`} />
           )}
-          <Field label="순 절약 (절약 − 처리비)" value={`${netSaved.toLocaleString()}원`} bold />
+          <Field label="순 절약 (180원 × 절감 무게)" value={`${netSaved.toLocaleString()}원`} bold />
         </div>
       </div>
 

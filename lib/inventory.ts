@@ -36,7 +36,8 @@ function budgetPath(userId?: string | null): string {
 export const DISPOSAL_COST_PER_KG = Number(
   process.env.DISPOSAL_COST_PER_KG ?? 180
 );
-const FOOD_VALUE_PER_KG = Number(process.env.FOOD_VALUE_PER_KG ?? 6000);
+// 잘 먹어서 버리지 않았을 때 절감되는 처리비 = 종량제 단가 그대로 적용 (kg당 180원).
+const FOOD_VALUE_PER_KG = Number(process.env.FOOD_VALUE_PER_KG ?? 180);
 
 function ensure(userId?: string | null) {
   const dir = userDir(userId);
