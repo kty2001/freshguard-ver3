@@ -32,9 +32,9 @@ function budgetPath(userId?: string | null): string {
   return path.join(userDir(userId), "budget.json");
 }
 
-// EC-01: 음식물 처리기 평균 가격 (kg당). 환경부 음식물쓰레기 종량제 평균 ~ 600원/kg.
+// EC-01: 음식물쓰레기 처리비 (kg당) — 환경부 종량제 봉투 기준 130원/kg.
 export const DISPOSAL_COST_PER_KG = Number(
-  process.env.DISPOSAL_COST_PER_KG ?? 600
+  process.env.DISPOSAL_COST_PER_KG ?? 130
 );
 const FOOD_VALUE_PER_KG = Number(process.env.FOOD_VALUE_PER_KG ?? 6000);
 
