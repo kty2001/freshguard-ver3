@@ -165,11 +165,11 @@ async function handleRecognize(req, res) {
   const system =
     "당신은 한국 가정 냉장고 사진에서 식재료만 추출하는 비전 모델입니다. " +
     "출력은 반드시 JSON 한 덩어리. 예: " +
-    "{\"items\":[{\"label\":\"사과\",\"quantity\":2,\"unit\":\"개\",\"confidence\":0.86,\"is_food\":true}]} " +
+    "{\"items\":[{\"label\":\"사과\",\"quantity\":2,\"unit\":\"개\",\"is_food\":true}]} " +
     "절대 규칙: " +
     "(A) 환각 금지. 사진에 명확히 보이지 않는 것은 절대 추측·추가하지 말 것. " +
     "    '아마 ~일 것 같다', '~로 보인다' 같은 추론은 출력하지 말 것. " +
-    "    확실하지 않으면 그 항목을 출력하지 말 것 (confidence가 0.6 미만이면 제외). " +
+    "    확실하지 않으면 그 항목을 출력하지 말 것. " +
     "(B) 식재료가 아닌 것은 모두 제외. 다음은 절대 출력하지 말 것: " +
     "    그릇·접시·컵·도마·칼·수저·포크·냉장고 선반·통·뚜껑·비닐봉지·종이상자 등 용기와 도구, " +
     "    상표·로고·문자·숫자, 사람·손·얼굴·옷, 배경·벽·바닥·테이블·식탁보, " +
@@ -181,8 +181,9 @@ async function handleRecognize(req, res) {
     "    예: apple→사과, egg→계란, tomato→토마토, milk→우유. " +
     "(E) 같은 식재료가 여러 개 보이면 한 항목으로 합치고 quantity 숫자로 표시. " +
     "    동일 label을 여러 번 반복 출력 금지. " +
-    "(F) unit은 개/모/장/포기/g/ml/팩/병 중 적절히. confidence는 사진에서 식별의 확신도(0~1). " +
-    "    is_food는 반드시 true로만 출력 (식재료가 아니면 애초에 항목을 만들지 말 것).";
+    "(F) unit은 개/모/장/포기/g/ml/팩/병 중 적절히. " +
+    "    is_food는 반드시 true로만 출력 (식재료가 아니면 애초에 항목을 만들지 말 것). " +
+    "(G) confidence·score·확신도 같은 신뢰도 필드는 절대 출력하지 말 것 — 토큰 낭비.";
 
   const prompt =
     "이 사진에서 실제로 보이는 식재료만 추출해 위 형식의 JSON으로 답하세요. " +
@@ -207,11 +208,10 @@ async function handleRecognize(req, res) {
         label: String(it.label ?? it.name ?? "").trim(),
         quantity: Number(it.quantity ?? it.count ?? 1) || 1,
         unit: String(it.unit ?? "개").trim() || "개",
-        confidence: Number(it.confidence ?? 0.7) || 0.7,
         is_food: it.is_food !== false,
       }))
-      // 비식품 + 낮은 신뢰도 (≤0.5) 모두 제외. 한국어 라벨 검증은 /api/recognize에서 한 번 더.
-      .filter((it) => it.label.length > 0 && it.is_food && it.confidence > 0.5)
+      // 비식품만 제외. 한국어 라벨 검증은 /api/recognize에서 한 번 더.
+      .filter((it) => it.label.length > 0 && it.is_food)
       .slice(0, 30);
   }
 
