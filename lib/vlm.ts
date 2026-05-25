@@ -7,7 +7,7 @@ import type { RecognizedItem } from "./types";
 import { recognize as remoteRecognize } from "./vlmServer";
 
 // 큰 사진을 그대로 보내면 서버 대역폭과 메모리에 부담 → longest side 제한.
-const MAX_SIDE = Number(process.env.VLM_CLIENT_MAX_SIDE ?? 1024);
+const MAX_SIDE = Number(process.env.VLM_CLIENT_MAX_SIDE ?? 640);
 const JPEG_QUALITY = Number(process.env.VLM_CLIENT_JPEG_QUALITY ?? 82);
 
 async function normalizeImage(input: Buffer): Promise<Buffer> {
@@ -20,7 +20,7 @@ async function normalizeImage(input: Buffer): Promise<Buffer> {
       withoutEnlargement: true,
     })
     .toColorspace("srgb")
-    .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+    .jpeg({ quality: JPEG_QUALITY, mozjpeg: false })
     .toBuffer();
 }
 
