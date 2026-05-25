@@ -164,9 +164,9 @@ export default function ManualAddCard({ onAdded, inline }: Props) {
                 {loading
                   ? "🔍 추천 유통기한을 가져오는 중..."
                   : rejected
-                    ? (suggestion?.note ?? "식품이 아닙니다")
+                    ? "식품이 아닙니다"
                     : suggestion
-                      ? `${suggestion.category ?? "기타"}${suggestion.note ? ` · ${suggestion.note}` : ""}`
+                      ? (suggestion.category ?? "기타")
                       : "잠시 후 추천이 표시됩니다"}
               </div>
             </div>
