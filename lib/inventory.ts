@@ -32,9 +32,9 @@ function budgetPath(userId?: string | null): string {
   return path.join(userDir(userId), "budget.json");
 }
 
-// EC-01: 음식물쓰레기 처리비 (kg당) — 환경부 종량제 봉투 기준 130원/kg.
+// EC-01: 음식물쓰레기 처리비 (kg당) — 종량제 봉투 기준 180원/kg.
 export const DISPOSAL_COST_PER_KG = Number(
-  process.env.DISPOSAL_COST_PER_KG ?? 130
+  process.env.DISPOSAL_COST_PER_KG ?? 180
 );
 const FOOD_VALUE_PER_KG = Number(process.env.FOOD_VALUE_PER_KG ?? 6000);
 

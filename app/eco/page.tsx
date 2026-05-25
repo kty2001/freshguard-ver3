@@ -96,7 +96,7 @@ export default function EcoPage() {
             label="음식물 처리 비용"
             value={`${s.disposal_cost_krw.toLocaleString()}원`}
             tone="warn"
-            hint={`kg당 ${process.env.NEXT_PUBLIC_DISPOSAL_PRICE ?? "130"}원 기준`}
+            hint={`kg당 ${process.env.NEXT_PUBLIC_DISPOSAL_PRICE ?? "180"}원 기준`}
           />
           {budget.total > 0 && (
             <Field label="가계부 누적 지출" value={`${budget.total.toLocaleString()}원`} />
