@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">FreshGuard</string>
+    <string name="app_name">Fresh Guard</string>
 
     <!-- Login -->
     <string name="login_subtitle">휴대폰 번호로 로그인</string>
