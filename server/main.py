@@ -259,7 +259,7 @@ async def recognize(request: Request, image: UploadFile = File(...), _=Depends(c
                     {"role": "system", "content": RECOGNIZE_SYSTEM},
                     {"role": "user", "content": RECOGNIZE_PROMPT, "images": [image_bytes]},
                 ],
-                options={"num_predict": 2048, "temperature": 0, "num_ctx": 4096},
+                options={"num_predict": 1024, "temperature": 0, "num_ctx": 4096},
             )
         except Exception as exc:
             error_box[0] = exc
@@ -495,7 +495,7 @@ async def suggest_recipes(request: Request, req: RecipesRequest, _=Depends(check
                     {"role": "system", "content": RECIPES_SYSTEM},
                     {"role": "user", "content": prompt},
                 ],
-                options={"num_predict": 2048, "temperature": 0.1, "num_ctx": 8192},
+                options={"num_predict": 1024, "temperature": 0.1, "num_ctx": 8192},
                 think=False,
             )
         except Exception as exc:

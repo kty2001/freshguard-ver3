@@ -1,18 +1,1 @@
-[
-  {
-    "id": "140d028e-4408-4ebe-bf59-2d17b990ff17",
-    "name": "두부",
-    "display_name": "두부",
-    "quantity": 1,
-    "unit": "모",
-    "category": "기타",
-    "storage_type": "냉장",
-    "added_at": "2026-05-25T03:30:04.694Z",
-    "expires_at": "2026-05-28T03:30:04.694Z",
-    "expiry_days_used": 3,
-    "is_consumed": true,
-    "matched_db_key": "두부",
-    "manual": true,
-    "consumed_at": "2026-05-25T03:30:12.118Z"
-  }
-]
+[]
