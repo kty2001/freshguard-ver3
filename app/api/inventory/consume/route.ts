@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { consumeItem } from "@/lib/inventory";
+import { getUserId } from "@/lib/userScope";
 import type { RemoveKind } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -11,6 +12,7 @@ function asKind(v: any): RemoveKind {
 }
 
 export async function POST(req: NextRequest) {
+  const uid = getUserId(req);
   const body = await req.json();
   const id: string | undefined = body?.id;
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
@@ -20,7 +22,7 @@ export async function POST(req: NextRequest) {
     typeof body?.qty === "number" && body.qty > 0
       ? Math.round(body.qty)
       : undefined;
-  const log = consumeItem(id, kind, weight_g, qty);
+  const log = consumeItem(id, kind, weight_g, qty, uid);
   if (kind === "mistake") return NextResponse.json({ ok: true, kind });
   if (!log)
     return NextResponse.json(

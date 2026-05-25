@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { suggestMenus } from "@/lib/recipe";
 import { expiringSoon, readItems } from "@/lib/inventory";
+import { getUserId } from "@/lib/userScope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const uid = getUserId(req);
     const body = await req.json().catch(() => ({}));
     const threshold = Number(body.threshold ?? 3);
     const allergies = Array.isArray(body.allergies) ? body.allergies : [];
@@ -15,8 +17,8 @@ export async function POST(req: NextRequest) {
       ? body.must_use.filter((x: unknown): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
 
-    const all = readItems().filter((i) => !i.is_consumed);
-    const expiring = expiringSoon(threshold);
+    const all = readItems(uid).filter((i) => !i.is_consumed);
+    const expiring = expiringSoon(threshold, uid);
 
     if (all.length === 0) {
       return NextResponse.json(

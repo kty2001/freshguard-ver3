@@ -19,3 +19,12 @@ MANUAL.md
 pre_organized.md
 pre.md
 diagrams
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/*.iml
+FreshGuard-debug.apk
+*.apk

@@ -254,19 +254,32 @@ export default function Home() {
                     onChange={(e) => updateItem(i, { label: e.target.value })}
                   />
                   <div className="row" style={{ gap: 6, marginTop: 6, alignItems: "center" }}>
-                    {/* FR-05: 인식 결과에도 개수 조정 */}
+                    {/* FR-05: 인식 결과에도 개수 조정 — 버튼 + 직접 입력 */}
                     <button
                       className="btn ghost"
                       onClick={() => updateItem(i, { quantity: Math.max(1, it.quantity - 1) })}
                       style={{ width: 32, minHeight: 32, padding: 0, fontSize: 16 }}
+                      aria-label="decrement"
                     >−</button>
-                    <span style={{ minWidth: 28, textAlign: "center", fontWeight: 700, fontSize: 14 }}>
-                      {it.quantity}
-                    </span>
+                    <input
+                      className="input"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={999}
+                      value={it.quantity}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (!Number.isFinite(v)) return;
+                        updateItem(i, { quantity: Math.max(1, Math.min(999, Math.round(v))) });
+                      }}
+                      style={{ width: 52, textAlign: "center", padding: "4px 6px", minHeight: 32, fontSize: 14, fontWeight: 700 }}
+                    />
                     <button
                       className="btn ghost"
                       onClick={() => updateItem(i, { quantity: Math.min(999, it.quantity + 1) })}
                       style={{ width: 32, minHeight: 32, padding: 0, fontSize: 16 }}
+                      aria-label="increment"
                     >＋</button>
                     <span className="badge warn" style={{ marginLeft: "auto" }}>저장 시 AI가 유통기한 추정</span>
                   </div>

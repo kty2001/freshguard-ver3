@@ -1,17 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { loadExpiryDb } from "@/lib/expiryDb";
 import { readItems, readLogs } from "@/lib/inventory";
+import { getUserId } from "@/lib/userScope";
 import { VLM_BASE, health } from "@/lib/vlmServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const uid = getUserId(req);
   const db = loadExpiryDb();
-  const items = readItems();
-  const logs = readLogs();
+  const items = readItems(uid);
+  const logs = readLogs(uid);
   const h = await health();
   return NextResponse.json({
+    user_id: uid,
     vlm_server_url: VLM_BASE,
     vlm_reachable: h.reachable,
     vlm_ok: h.ok,

@@ -35,6 +35,8 @@ function fallbackMessage(name: string, d: number): string {
 
 export default function AppBar() {
   const path = usePathname() || "/";
+  // 로그인 페이지에서는 AppBar 숨김 — 로그인 전에는 미들웨어가 막아주지만 안전망.
+  if (path === "/login") return null;
   const title = TITLES[path] ?? "FreshGuard";
   const [items, setItems] = useState<AlertItem[]>([]);
   const [open, setOpen] = useState(false);
