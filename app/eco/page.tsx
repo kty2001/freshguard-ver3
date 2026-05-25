@@ -88,29 +88,6 @@ export default function EcoPage() {
         <StatBig label="연속 관리" value={s.streak_days} unit="일" tint="rgba(251,113,133,0.18)" />
       </div>
 
-      {/* EC-01: 처리 비용 / 절약 금액 분리 표기 */}
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>💰 금액 요약</h2>
-        <div className="col" style={{ gap: 0 }}>
-          <Field
-            label="잘 먹어서 절약한 금액"
-            value={`${s.money_saved_krw.toLocaleString()}원`}
-            tone="ok"
-            hint={`kg당 ${process.env.NEXT_PUBLIC_DISPOSAL_PRICE ?? "180"}원 × 절감 무게`}
-          />
-          <Field
-            label="음식물 처리 비용"
-            value={`${s.disposal_cost_krw.toLocaleString()}원`}
-            tone="warn"
-            hint={`kg당 ${process.env.NEXT_PUBLIC_DISPOSAL_PRICE ?? "180"}원 기준`}
-          />
-          {budget.total > 0 && (
-            <Field label="가계부 누적 지출" value={`${budget.total.toLocaleString()}원`} />
-          )}
-          <Field label="순 절약 (180원 × 절감 무게)" value={`${netSaved.toLocaleString()}원`} bold />
-        </div>
-      </div>
-
       <div className="card">
         <div className="row spread"><h2 style={{ margin: 0 }}>최근 7일</h2><span className="tiny">소비 ▮ / 처리 ▯</span></div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 120, marginTop: 8 }}>
