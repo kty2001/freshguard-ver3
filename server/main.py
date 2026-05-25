@@ -230,7 +230,7 @@ RECOGNIZE_PROMPT = """이미지에서 보이는 모든 식재료를 식별하세
 
 {
   "items": [
-    {"label": "식재료명(한국어)", "quantity": 수량, "unit": "단위", "confidence": 0.0~1.0}
+    {"label": "식재료명(한국어)", "quantity": 수량, "unit": "단위"}
   ]
 }
 
@@ -292,7 +292,6 @@ async def recognize(request: Request, image: UploadFile = File(...), _=Depends(c
                     "label": clamp_str(item["label"], 40),
                     "quantity": float(re.search(r"[\d.]+", str(item.get("quantity", 1))).group()),
                     "unit": clamp_str(item.get("unit", "개"), 10),
-                    "confidence": max(0.0, min(1.0, float(item.get("confidence", 0.8)))),
                 })
             yield json.dumps({
                 "items": validated,
