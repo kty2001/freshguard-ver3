@@ -1,1 +1,41 @@
-[]
+[
+  {
+    "kind": "eaten",
+    "disposal_cost_krw": 0,
+    "id": "cc2770ca-54bb-4ec2-92f4-40d100c2deab",
+    "item_id": "50c49da2-3b3a-4dc3-ad5e-50a186a7bbf8",
+    "name": "비둘기",
+    "category": "육류",
+    "quantity": 1,
+    "consumed_at": "2026-05-25T07:12:40.536Z",
+    "co2_saved_kg": 0.2,
+    "food_waste_g": 80,
+    "money_saved_krw": 14
+  },
+  {
+    "kind": "eaten",
+    "disposal_cost_krw": 0,
+    "id": "7a4f9d6c-906c-426a-852b-a695cf6212a5",
+    "item_id": "e7c02007-97cd-462b-a9f7-7acecd0cbf4e",
+    "name": "장아찌",
+    "category": "발효식품",
+    "quantity": 1,
+    "consumed_at": "2026-05-25T07:12:40.890Z",
+    "co2_saved_kg": 0.2,
+    "food_waste_g": 80,
+    "money_saved_krw": 14
+  },
+  {
+    "id": "b5ce5e18-4543-40d0-b016-95b29305fb57",
+    "item_id": "96e6b564-8cf5-44a2-9bed-b145d2f35a4a",
+    "name": "버섯",
+    "category": "채소류",
+    "quantity": 5,
+    "consumed_at": "2026-05-25T07:12:43.534Z",
+    "kind": "eaten",
+    "co2_saved_kg": 0.16,
+    "food_waste_g": 400,
+    "money_saved_krw": 72,
+    "disposal_cost_krw": 0
+  }
+]
